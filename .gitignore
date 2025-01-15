@@ -1,0 +1,4 @@
+*.so
+compileSO.sh
+_*
+

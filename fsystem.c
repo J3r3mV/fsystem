@@ -2,8 +2,9 @@
  * Source .c for creating a module for Lua to have system features on file.
  * I will add to this file as my new needs arise, to date:
  * - readdirFile() : Reads file names from the specified directory.
+ * - fileFormat() : Returns the Unix or Windows file format
  * Author: J3r3m - https://github.com/J3r3mV
- * Version : 0.9
+ * Version : 1.0
  */
 
 #include <stdio.h>
@@ -14,6 +15,8 @@
 #include <lua5.4/lua.h>
 #include <lua5.4/lualib.h>
 #include <lua5.4/lauxlib.h>
+
+#define BUFFER_SIZE 1024
 
 /**
  * @Description : Holds file names read from a directory.
@@ -78,7 +81,7 @@ stFiles readdirFile_c(const char *path)
     {
         perror("Error ");
         freeStFile(stFilesDir);
-        exit(-1);
+        exit(1);
     }
 
     return stFilesDir;
@@ -112,6 +115,53 @@ int readdirFile(lua_State *L)
 }
 
 /**
+ * @Description Returns the Unix or Windows file format depending
+ * on the end-of-line return.
+ * @param path : Path to the file to read.
+ * @return : Integer : 0 = Indeterminate format or empty, 1 = Unix, 2 = Windows
+ */
+int fileFormat(lua_State *L)
+{
+    const char *sPathFile = luaL_checkstring(L, 1);
+
+    FILE *fFile = fopen(sPathFile, "rb");
+    if (!fFile)
+    {
+        perror("");
+        return luaL_error(L, "Error opening file");
+    }
+
+    char buffer[BUFFER_SIZE];
+    size_t iBytesRead = fread(buffer, 1, BUFFER_SIZE, fFile);
+    fclose(fFile);
+
+    int result = 0;
+
+    // "File empty or unknow !"
+    if (iBytesRead == 0)
+        result = 0;
+
+    for (size_t i = 0; i < iBytesRead; i++)
+    {
+        if (buffer[i] == '\r' && buffer[i + 1] == '\n')
+        {
+            result = 2;
+            break;
+        }
+
+        if (buffer[i] == '\n')
+        {
+            result = 1;
+            break;
+        }
+    }
+
+    lua_pushinteger(L, result);
+
+    return 1;
+}
+
+/**
  * @Description : Lua module entry point.
  * Registers the functions provided by this module for use in Lua.
  * The module is opened with `require('fsystem')`.
@@ -120,10 +170,11 @@ int readdirFile(lua_State *L)
  */
 int luaopen_fsystem(lua_State *L)
 {
-    static const struct luaL_Reg mesFonctions[] = {
+    static const struct luaL_Reg fn[] = {
         {"readdirFile", readdirFile},
+        {"fileFormat", fileFormat},
         {NULL, NULL}};
 
-    luaL_newlib(L, mesFonctions);
+    luaL_newlib(L, fn);
     return 1;
 }
